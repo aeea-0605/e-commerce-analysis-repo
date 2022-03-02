@@ -41,3 +41,36 @@ def trans_interaction_matrix(df, impute=None):
         return pivot_df.T.fillna(pivot_df.mean(axis=1)).T
     else:
         return pivot_df
+
+
+def search_n_similarities(cosine_matrix, target_id, df_index, n):
+    target_index = np.where(df_index == target_id)[0][0]
+
+    similarities = (
+        pd.Series(cosine_matrix[target_index], index=df_index)
+        .drop(target_id, axis=0)
+    ).sort_values(ascending=False)
+
+    n_similarities = similarities[similarities.values == 1.0]
+    if len(n_similarities) < n:
+        n_similarities = similarities[:n]
+
+    return n_similarities
+
+
+def predict_target_scores(zero_ratings, mean_scores, n_similarities, target):
+    scores_dict = {target: [], 'prediction': []}
+    for target_id in zero_ratings.columns:
+        target_idx = np.where(zero_ratings.loc[:, target_id].values != 0.0)[0]
+
+        scores_dict[target].append(target_id)
+        if len(target_idx) == 0:
+            scores_dict['prediction'].append(mean_scores.loc[target_id])
+        else:
+            zero_ratings_val = [zero_ratings.loc[:, target_id].values[idx] for idx in target_idx]
+            n_similarities_val = [n_similarities.values[idx] for idx in target_idx]
+
+            score = np.sum(zero_ratings_val) / np.sum(n_similarities_val)
+            scores_dict['prediction'].append(score)
+
+    return scores_dict
